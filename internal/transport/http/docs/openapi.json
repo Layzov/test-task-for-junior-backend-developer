@@ -2,57 +2,78 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Task Service API",
-    "version": "1.0.0",
-    "description": "CRUD API for tasks built with clean architecture."
+    "version": "1.1.0",
+    "description": "CRUD API for tasks with recurring task templates."
   },
-  "servers": [
-    {
-      "url": "http://localhost:8080"
-    }
-  ],
+  "servers": [{ "url": "http://localhost:8080" }],
   "tags": [
-    {
-      "name": "Tasks",
-      "description": "Operations with tasks"
-    }
+    { "name": "Tasks", "description": "Operations with task instances" },
+    { "name": "Templates", "description": "Operations with recurring task templates" }
   ],
   "paths": {
     "/api/v1/tasks": {
       "get": {
         "tags": ["Tasks"],
-        "summary": "List tasks",
+        "summary": "List tasks (optionally filtered by scheduled date)",
+        "parameters": [
+          {
+            "name": "scheduled_for",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string", "format": "date" },
+            "description": "Filter by scheduled date (YYYY-MM-DD)"
+          }
+        ],
         "responses": {
           "200": {
             "description": "Task list",
             "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": { "$ref": "#/components/schemas/Task" }
-                }
-              }
+              "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Task" } } }
             }
           }
         }
       },
       "post": {
         "tags": ["Tasks"],
-        "summary": "Create task",
+        "summary": "Create manual task",
         "requestBody": {
           "required": true,
-          "content": {
-            "application/json": {
-              "schema": { "$ref": "#/components/schemas/CreateTaskRequest" }
-            }
-          }
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateTaskRequest" } } }
         },
         "responses": {
           "201": {
             "description": "Created task",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Task" } } }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
+    },
+    "/api/v1/tasks/generate": {
+      "post": {
+        "tags": ["Tasks"],
+        "summary": "Generate tasks from active templates for date",
+        "parameters": [
+          {
+            "name": "date",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string", "format": "date" },
+            "description": "Generation date in YYYY-MM-DD format"
+          },
+          {
+            "name": "template_id",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "integer", "format": "int64", "minimum": 1 },
+            "description": "Optional template id for point generation. If omitted, generation runs for all active templates."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Generated or upserted tasks for date",
             "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/Task" }
-              }
+              "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Task" } } }
             }
           },
           "400": { "$ref": "#/components/responses/BadRequest" }
@@ -63,54 +84,22 @@
       "get": {
         "tags": ["Tasks"],
         "summary": "Get task by ID",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": { "type": "integer", "format": "int64", "minimum": 1 }
-          }
-        ],
+        "parameters": [{ "$ref": "#/components/parameters/Id" }],
         "responses": {
-          "200": {
-            "description": "Task",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/Task" }
-              }
-            }
-          },
+          "200": { "description": "Task", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Task" } } } },
           "404": { "$ref": "#/components/responses/NotFound" }
         }
       },
       "put": {
         "tags": ["Tasks"],
         "summary": "Update task",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": { "type": "integer", "format": "int64", "minimum": 1 }
-          }
-        ],
+        "parameters": [{ "$ref": "#/components/parameters/Id" }],
         "requestBody": {
           "required": true,
-          "content": {
-            "application/json": {
-              "schema": { "$ref": "#/components/schemas/UpdateTaskRequest" }
-            }
-          }
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UpdateTaskRequest" } } }
         },
         "responses": {
-          "200": {
-            "description": "Updated task",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/Task" }
-              }
-            }
-          },
+          "200": { "description": "Updated task", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Task" } } } },
           "400": { "$ref": "#/components/responses/BadRequest" },
           "404": { "$ref": "#/components/responses/NotFound" }
         }
@@ -118,14 +107,67 @@
       "delete": {
         "tags": ["Tasks"],
         "summary": "Delete task",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": { "type": "integer", "format": "int64", "minimum": 1 }
+        "parameters": [{ "$ref": "#/components/parameters/Id" }],
+        "responses": {
+          "204": { "description": "Deleted" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/task-templates": {
+      "get": {
+        "tags": ["Templates"],
+        "summary": "List task templates",
+        "responses": {
+          "200": {
+            "description": "Template list",
+            "content": {
+              "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/TaskTemplate" } } }
+            }
           }
-        ],
+        }
+      },
+      "post": {
+        "tags": ["Templates"],
+        "summary": "Create task template",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateTaskTemplateRequest" } } }
+        },
+        "responses": {
+          "201": { "description": "Created template", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TaskTemplate" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
+    },
+    "/api/v1/task-templates/{id}": {
+      "get": {
+        "tags": ["Templates"],
+        "summary": "Get template by ID",
+        "parameters": [{ "$ref": "#/components/parameters/Id" }],
+        "responses": {
+          "200": { "description": "Template", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TaskTemplate" } } } },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "put": {
+        "tags": ["Templates"],
+        "summary": "Update template",
+        "parameters": [{ "$ref": "#/components/parameters/Id" }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UpdateTaskTemplateRequest" } } }
+        },
+        "responses": {
+          "200": { "description": "Updated template", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TaskTemplate" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "delete": {
+        "tags": ["Templates"],
+        "summary": "Delete template",
+        "parameters": [{ "$ref": "#/components/parameters/Id" }],
         "responses": {
           "204": { "description": "Deleted" },
           "404": { "$ref": "#/components/responses/NotFound" }
@@ -134,22 +176,22 @@
     }
   },
   "components": {
+    "parameters": {
+      "Id": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "integer", "format": "int64", "minimum": 1 }
+      }
+    },
     "responses": {
       "BadRequest": {
         "description": "Bad request",
-        "content": {
-          "application/json": {
-            "schema": { "$ref": "#/components/schemas/Error" }
-          }
-        }
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
       },
       "NotFound": {
         "description": "Resource not found",
-        "content": {
-          "application/json": {
-            "schema": { "$ref": "#/components/schemas/Error" }
-          }
-        }
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
       }
     },
     "schemas": {
@@ -157,64 +199,69 @@
         "type": "object",
         "required": ["title"],
         "properties": {
-          "title": {
-            "type": "string",
-            "example": "Prepare release"
-          },
-          "description": {
-            "type": "string",
-            "example": "Collect release notes and check migrations"
-          },
-          "status": {
-            "type": "string",
-            "enum": ["new", "in_progress", "done"],
-            "example": "new"
-          }
+          "title": { "type": "string", "example": "Prepare release" },
+          "description": { "type": "string", "example": "Collect release notes and check migrations" },
+          "status": { "type": "string", "enum": ["new", "in_progress", "done"], "example": "new" }
         }
       },
       "UpdateTaskRequest": {
         "type": "object",
         "required": ["title", "status"],
         "properties": {
-          "title": {
-            "type": "string",
-            "example": "Prepare release"
-          },
-          "description": {
-            "type": "string",
-            "example": "Collect release notes and check migrations"
-          },
-          "status": {
-            "type": "string",
-            "enum": ["new", "in_progress", "done"],
-            "example": "in_progress"
-          }
+          "title": { "type": "string", "example": "Prepare release" },
+          "description": { "type": "string", "example": "Collect release notes and check migrations" },
+          "status": { "type": "string", "enum": ["new", "in_progress", "done"], "example": "in_progress" }
+        }
+      },
+      "Recurrence": {
+        "type": "object",
+        "required": ["type"],
+        "properties": {
+          "type": { "type": "string", "enum": ["daily_interval", "monthly_days", "specific_dates", "odd_even"] },
+          "interval_days": { "type": "integer", "minimum": 1, "example": 2 },
+          "month_days": { "type": "array", "items": { "type": "integer", "minimum": 1, "maximum": 30 }, "example": [1, 15, 30] },
+          "specific_dates": { "type": "array", "items": { "type": "string", "format": "date" }, "example": ["2026-04-20", "2026-05-01"] },
+          "odd_even_type": { "type": "string", "enum": ["odd", "even"], "example": "even" }
+        }
+      },
+      "CreateTaskTemplateRequest": {
+        "type": "object",
+        "required": ["title", "recurrence", "starts_on"],
+        "properties": {
+          "title": { "type": "string", "example": "Daily patient calls" },
+          "description": { "type": "string", "example": "Call patients for follow-up" },
+          "recurrence": { "$ref": "#/components/schemas/Recurrence" },
+          "starts_on": { "type": "string", "format": "date", "example": "2026-04-01" },
+          "ends_on": { "type": "string", "format": "date", "example": "2026-05-01" },
+          "is_active": { "type": "boolean", "example": true }
+        }
+      },
+      "UpdateTaskTemplateRequest": { "$ref": "#/components/schemas/CreateTaskTemplateRequest" },
+      "TaskTemplate": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer", "format": "int64", "example": 1 },
+          "title": { "type": "string", "example": "Daily patient calls" },
+          "description": { "type": "string", "example": "Call patients for follow-up" },
+          "recurrence": { "$ref": "#/components/schemas/Recurrence" },
+          "starts_on": { "type": "string", "format": "date", "example": "2026-04-01" },
+          "ends_on": { "type": "string", "format": "date", "example": "2026-05-01", "nullable": true },
+          "is_active": { "type": "boolean", "example": true },
+          "created_at": { "type": "string", "format": "date-time" },
+          "updated_at": { "type": "string", "format": "date-time" }
         }
       },
       "Task": {
         "type": "object",
         "properties": {
           "id": { "type": "integer", "format": "int64", "example": 1 },
-          "title": { "type": "string", "example": "Prepare release" },
-          "description": {
-            "type": "string",
-            "example": "Collect release notes and check migrations"
-          },
-          "status": {
-            "type": "string",
-            "enum": ["new", "in_progress", "done"],
-            "example": "new"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "example": "2026-03-24T00:00:00Z"
-          },
-          "updated_at": {
-            "type": "string",
-            "format": "date-time",
-            "example": "2026-03-24T00:00:00Z"
-          }
+          "title": { "type": "string", "example": "Daily patient calls" },
+          "description": { "type": "string", "example": "Call patients for follow-up" },
+          "status": { "type": "string", "enum": ["new", "in_progress", "done"], "example": "new" },
+          "template_id": { "type": "integer", "format": "int64", "nullable": true, "example": 12 },
+          "scheduled_for": { "type": "string", "format": "date", "nullable": true, "example": "2026-04-20" },
+          "created_at": { "type": "string", "format": "date-time", "example": "2026-04-20T00:00:00Z" },
+          "updated_at": { "type": "string", "format": "date-time", "example": "2026-04-20T00:00:00Z" }
         }
       },
       "Error": {

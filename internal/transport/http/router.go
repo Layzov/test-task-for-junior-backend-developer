@@ -20,9 +20,16 @@ func NewRouter(taskHandler *httphandlers.TaskHandler, docsHandler *swaggerdocs.H
 
 	api.HandleFunc("/tasks", taskHandler.Create).Methods(http.MethodPost)
 	api.HandleFunc("/tasks", taskHandler.List).Methods(http.MethodGet)
+	api.HandleFunc("/tasks/generate", taskHandler.GenerateTasksForDate).Methods(http.MethodPost)
 	api.HandleFunc("/tasks/{id:[0-9]+}", taskHandler.GetByID).Methods(http.MethodGet)
 	api.HandleFunc("/tasks/{id:[0-9]+}", taskHandler.Update).Methods(http.MethodPut)
 	api.HandleFunc("/tasks/{id:[0-9]+}", taskHandler.Delete).Methods(http.MethodDelete)
+
+	api.HandleFunc("/task-templates", taskHandler.CreateTemplate).Methods(http.MethodPost)
+	api.HandleFunc("/task-templates", taskHandler.ListTemplates).Methods(http.MethodGet)
+	api.HandleFunc("/task-templates/{id:[0-9]+}", taskHandler.GetTemplateByID).Methods(http.MethodGet)
+	api.HandleFunc("/task-templates/{id:[0-9]+}", taskHandler.UpdateTemplate).Methods(http.MethodPut)
+	api.HandleFunc("/task-templates/{id:[0-9]+}", taskHandler.DeleteTemplate).Methods(http.MethodDelete)
 
 	return router
 }
